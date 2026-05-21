@@ -73,6 +73,36 @@ Level-3-User-Auth/
     wrangler.toml             # D1 binding + Pages Functions config
 ```
 
+## Live Deployment
+
+| Environment | URL |
+|---|---|
+| Cloudflare Pages | https://codveda-auth.pages.dev |
+| Custom Domain | https://auth.kristianhans.com |
+
+Deployed via **GitHub auto-deploy**: every push to `main` triggers a new Cloudflare Pages build automatically.
+
+## OAuth Providers
+
+In addition to email/password, users can sign in with:
+
+| Provider | Setup Required |
+|----------|---------------|
+| GitHub | Create OAuth App at https://github.com/settings/developers |
+| Google | Create OAuth Client at https://console.cloud.google.com/apis/credentials |
+
+**Callback URLs to configure in your OAuth apps:**
+- GitHub: `https://auth.kristianhans.com/api/auth/oauth/github/callback`
+- Google: `https://auth.kristianhans.com/api/auth/oauth/google/callback`
+
+**Secrets to set after creating OAuth apps:**
+```bash
+echo "$GITHUB_CLIENT_ID"     | npx wrangler pages secret put GITHUB_CLIENT_ID     --project-name codveda-auth
+echo "$GITHUB_CLIENT_SECRET" | npx wrangler pages secret put GITHUB_CLIENT_SECRET  --project-name codveda-auth
+echo "$GOOGLE_CLIENT_ID"     | npx wrangler pages secret put GOOGLE_CLIENT_ID      --project-name codveda-auth
+echo "$GOOGLE_CLIENT_SECRET" | npx wrangler pages secret put GOOGLE_CLIENT_SECRET  --project-name codveda-auth
+```
+
 ## API Endpoints
 
 | Method | Path | Auth | Description |
@@ -81,6 +111,10 @@ Level-3-User-Auth/
 | POST | `/api/auth/login` | Public | Authenticate, returns JWT cookie |
 | POST | `/api/auth/logout` | Any | Clears auth cookie |
 | GET | `/api/auth/me` | Required | Returns authenticated user profile |
+| GET | `/api/auth/oauth/github` | Public | Initiate GitHub OAuth flow |
+| GET | `/api/auth/oauth/github/callback` | Public | GitHub OAuth callback |
+| GET | `/api/auth/oauth/google` | Public | Initiate Google OAuth flow |
+| GET | `/api/auth/oauth/google/callback` | Public | Google OAuth callback |
 
 ## Local Development
 
@@ -88,15 +122,18 @@ Level-3-User-Auth/
 cd frontend
 npm install
 
-# Create a local D1 database
-npx wrangler d1 create codveda-auth-db
-# Update database_id in wrangler.toml with the returned ID
+# For local dev, apply schema to a local D1 instance:
+npx wrangler d1 execute codveda-db --local --file=../database/schema.sql
 
-# Apply the schema
-npx wrangler d1 execute codveda-auth-db --local --file=../database/schema.sql
-
-# Set the JWT secret for local development
-echo 'JWT_SECRET=your-strong-secret-here-min-32-chars' > .dev.vars
+# Set secrets for local development:
+cat > .dev.vars << 'EOF'
+JWT_SECRET=your-strong-secret-here-min-32-chars
+APP_URL=http://localhost:5173
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+EOF
 
 # Start local dev server (Vite + Pages Functions + D1)
 npx wrangler pages dev dist -- npm run dev
@@ -104,38 +141,54 @@ npx wrangler pages dev dist -- npm run dev
 
 ## Deployment to Cloudflare
 
+This project is deployed to Cloudflare Pages with GitHub integration.
+The D1 database (`codveda-db`, shared with Level-3-Fullstack-CRUD) is already bound
+under the `DB` environment variable. `JWT_SECRET` and `APP_URL` are already set.
+
 ```bash
-# 1. Create the D1 database (if not created)
-npx wrangler d1 create codveda-auth-db
-# Copy the database_id into wrangler.toml
+# The shared D1 database (codveda-db) was created once for all Level-3 projects:
+# npx wrangler d1 create codveda-db
+# DB ID: 3861c2d8-7327-4032-81f6-36e91bb0ddad
 
-# 2. Apply schema to production D1
-npx wrangler d1 execute codveda-auth-db --file=../database/schema.sql
+# Apply/re-apply the merged schema to production D1 (run from repo root):
+npx wrangler d1 execute codveda-db --remote --file=./database/schema.sql
 
-# 3. Set the JWT secret in production
-npx wrangler secret put JWT_SECRET
-# Enter a strong, random 32+ character secret
+# Secrets already set in production (re-set if rotating):
+echo "$JWT_SECRET" | npx wrangler pages secret put JWT_SECRET --project-name codveda-auth
+echo "https://auth.kristianhans.com" | npx wrangler pages secret put APP_URL --project-name codveda-auth
 
-# 4. Build and deploy to Cloudflare Pages
+# Build and deploy manually (normally handled by GitHub auto-deploy):
+cd frontend
 npm run build
-npx wrangler pages deploy dist --project-name=codveda-user-auth
+npx wrangler pages deploy dist --project-name=codveda-auth
 
-# The app will be available at:
-# https://codveda-user-auth.pages.dev
+# The app is live at:
+# https://codveda-auth.pages.dev
+# https://auth.kristianhans.com
 ```
 
 ## Database Schema
 
+The shared `codveda-db` D1 database (DB ID: `3861c2d8-7327-4032-81f6-36e91bb0ddad`) is used across all Level-3 projects. Full schema at `../database/schema.sql`.
+
 **users** table:
 - `id` TEXT PRIMARY KEY (UUID via crypto.randomUUID)
 - `email` TEXT UNIQUE (normalized: lowercase, trimmed)
-- `password_hash` TEXT (format: `iterations:salt_hex:hash_hex`)
+- `password_hash` TEXT (format: `iterations:salt_hex:hash_hex` — null for OAuth-only accounts)
 - `display_name` TEXT
 - `created_at` / `updated_at` DATETIME
+
+**oauth_accounts** table:
+- `id` TEXT PRIMARY KEY
+- `user_id` TEXT REFERENCES users(id) ON DELETE CASCADE
+- `provider` TEXT (github | google)
+- `provider_user_id` TEXT
+- UNIQUE constraint on (provider, provider_user_id)
+- Links OAuth identities to a single user account
 
 **auth_attempts** table:
 - `id` INTEGER PRIMARY KEY AUTOINCREMENT
 - `email` TEXT, `ip_address` TEXT
 - `attempted_at` DATETIME
 - `success` INTEGER (0 = failed, 1 = success)
-- Indexes on (email, attempted_at) and (ip_address, attempted_at)
+- Indexes on (email, attempted_at) and (ip_address, attempted_at) for rate-limit queries
