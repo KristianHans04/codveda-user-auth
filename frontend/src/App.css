@@ -4,17 +4,17 @@
    ============================================ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root {
-  --color-bg: #0f172a;
-  --color-bg-secondary: #1e293b;
-  --color-surface: rgba(255,255,255,0.04);
+  --color-bg: #102a0f;
+  --color-bg-secondary: #3a3b1e;
+  --color-surface: rgba(255, 255, 255, 0.04);
   --color-surface-hover: rgba(255,255,255,0.07);
   --color-glass: rgba(255,255,255,0.05);
   --color-glass-border: rgba(255,255,255,0.1);
   --color-text: #f1f5f9;
   --color-text-secondary: #94a3b8;
   --color-text-muted: #64748b;
-  --color-accent: #6366f1;
-  --color-accent-hover: #818cf8;
+  --color-accent: #06a700;
+  --color-accent-hover: #85f881;
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
