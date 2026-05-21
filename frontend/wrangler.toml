@@ -1,9 +1,8 @@
-name = "codveda-user-auth"
+name = "codveda-auth"
 compatibility_date = "2024-12-01"
-compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "dist"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "codveda-auth-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_name = "codveda-db"
+database_id = "3861c2d8-7327-4032-81f6-36e91bb0ddad"

@@ -1,13 +1,17 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import OAuthButtons from '../components/OAuthButtons';
 
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const oauthError = searchParams.get('error');
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(oauthError || '');
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e) {
@@ -29,6 +33,11 @@ export default function LoginPage() {
       <div className="auth-card">
         <h1>Sign In</h1>
         <p className="auth-subtitle">Access your secure dashboard.</p>
+
+        <OAuthButtons action="sign in" />
+
+        <div className="auth-divider"><span>or continue with email</span></div>
+
         {error && <div className="auth-error" role="alert">{error}</div>}
         <form onSubmit={handleSubmit} className="auth-form" noValidate>
           <label htmlFor="login-email">Email</label>
