@@ -1,13 +1,9 @@
 import {
   jsonResponse, errorResponse, hashPassword, normalizeEmail,
-  validateEmail, setAuthCookie, signJwt,
+  validateEmail, setAuthCookie, signJwt, withErrorLogging,
 } from './_helpers.js';
 
-/**
- * POST /api/auth/register
- * Create a new user account.
- */
-export async function onRequestPost(context) {
+async function handleRegister(context) {
   const { env, request } = context;
   const db = env.DB;
 
@@ -60,3 +56,5 @@ export async function onRequestPost(context) {
   response.headers.set('Set-Cookie', setAuthCookie(token));
   return response;
 }
+
+export const onRequestPost = withErrorLogging(handleRegister, "POST /auth/register");

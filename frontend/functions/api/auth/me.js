@@ -1,10 +1,6 @@
-import { jsonResponse, errorResponse, getAuthCookie, verifyJwt } from './_helpers.js';
+import { jsonResponse, errorResponse, getAuthCookie, verifyJwt, withErrorLogging } from './_helpers.js';
 
-/**
- * GET /api/auth/me
- * Return the authenticated user's profile from the JWT cookie.
- */
-export async function onRequestGet(context) {
+async function handleMe(context) {
   const { env, request } = context;
   const db = env.DB;
 
@@ -29,3 +25,5 @@ export async function onRequestGet(context) {
 
   return jsonResponse({ user });
 }
+
+export const onRequestGet = withErrorLogging(handleMe, "GET /auth/me");

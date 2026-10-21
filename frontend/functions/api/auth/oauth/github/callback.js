@@ -1,10 +1,6 @@
 import { getStateCookie, upsertOAuthUser, createOAuthSession, oauthErrorRedirect } from '../_oauth_helpers.js';
 
-/**
- * GET /api/auth/oauth/github/callback
- * Exchange GitHub authorization code for user data, create session.
- */
-export async function onRequestGet(context) {
+async function handleGithubCallback(context) {
   const { env, request } = context;
   const db = env.DB;
   const url = new URL(request.url);
@@ -16,7 +12,6 @@ export async function onRequestGet(context) {
     return oauthErrorRedirect('Invalid OAuth state. Please try again.');
   }
 
-  // Exchange code for access token
   const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -32,13 +27,11 @@ export async function onRequestGet(context) {
     return oauthErrorRedirect('GitHub authentication failed. Please try again.');
   }
 
-  // Fetch user profile
   const userRes = await fetch('https://api.github.com/user', {
     headers: { Authorization: `Bearer ${tokenData.access_token}`, 'User-Agent': 'Codveda-Auth/1.0' },
   });
   const ghUser = await userRes.json();
 
-  // Fetch primary email if not public
   let email = ghUser.email;
   if (!email) {
     const emailRes = await fetch('https://api.github.com/user/emails', {
@@ -59,3 +52,14 @@ export async function onRequestGet(context) {
 
   return createOAuthSession(user, env.JWT_SECRET);
 }
+
+export const onRequestGet = async (context) => {
+  try {
+    return await handleGithubCallback(context);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error("[CODVEDA-AUTH] GET /auth/oauth/github/callback error:", message, stack);
+    return oauthErrorRedirect('Authentication failed. Please try again.');
+  }
+};

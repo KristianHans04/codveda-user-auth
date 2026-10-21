@@ -1,10 +1,6 @@
 import { getStateCookie, upsertOAuthUser, createOAuthSession, oauthErrorRedirect } from '../_oauth_helpers.js';
 
-/**
- * GET /api/auth/oauth/google/callback
- * Exchange Google authorization code for user data, create session.
- */
-export async function onRequestGet(context) {
+async function handleGoogleCallback(context) {
   const { env, request } = context;
   const db = env.DB;
   const url = new URL(request.url);
@@ -16,7 +12,6 @@ export async function onRequestGet(context) {
     return oauthErrorRedirect('Invalid OAuth state. Please try again.');
   }
 
-  // Exchange code for tokens
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -33,7 +28,6 @@ export async function onRequestGet(context) {
     return oauthErrorRedirect('Google authentication failed. Please try again.');
   }
 
-  // Fetch user info via OpenID Connect userinfo endpoint
   const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
     headers: { Authorization: `Bearer ${tokenData.access_token}` },
   });
@@ -49,3 +43,14 @@ export async function onRequestGet(context) {
 
   return createOAuthSession(user, env.JWT_SECRET);
 }
+
+export const onRequestGet = async (context) => {
+  try {
+    return await handleGoogleCallback(context);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error("[CODVEDA-AUTH] GET /auth/oauth/google/callback error:", message, stack);
+    return oauthErrorRedirect('Authentication failed. Please try again.');
+  }
+};

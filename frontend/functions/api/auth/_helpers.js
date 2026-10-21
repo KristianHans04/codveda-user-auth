@@ -17,6 +17,19 @@ export function errorResponse(message, status = 400) {
   return jsonResponse({ error: message }, status);
 }
 
+export function withErrorLogging(handler, label = "auth") {
+  return async function (context) {
+    try {
+      return await handler(context);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : undefined;
+      console.error(`[CODVEDA-AUTH] ${label} error:`, message, stack);
+      return errorResponse("Internal server error", 500);
+    }
+  };
+}
+
 // ---------- Password Hashing (PBKDF2 via WebCrypto) ----------
 
 const PBKDF2_ITERATIONS = 100000;

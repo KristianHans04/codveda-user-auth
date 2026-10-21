@@ -1,14 +1,10 @@
 import {
   jsonResponse, errorResponse, verifyPassword, normalizeEmail,
   validateEmail, setAuthCookie, signJwt,
-  checkRateLimit, recordAttempt,
+  checkRateLimit, recordAttempt, withErrorLogging,
 } from './_helpers.js';
 
-/**
- * POST /api/auth/login
- * Authenticate and receive a JWT in an HTTP-only cookie.
- */
-export async function onRequestPost(context) {
+async function handleLogin(context) {
   const { env, request } = context;
   const db = env.DB;
 
@@ -32,7 +28,6 @@ export async function onRequestPost(context) {
   const email = normalizeEmail(rawEmail);
   const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
 
-  // Check rate limiting
   const limit = await checkRateLimit(db, email, ip);
   if (limit.blocked) {
     return errorResponse(
@@ -41,14 +36,12 @@ export async function onRequestPost(context) {
     );
   }
 
-  // Find user
   const user = await db.prepare('SELECT id, email, password_hash, display_name FROM users WHERE email = ?').bind(email).first();
   if (!user) {
     await recordAttempt(db, email, ip, false);
     return errorResponse('Invalid email or password.', 401);
   }
 
-  // Verify password
   const valid = await verifyPassword(password, user.password_hash);
   if (!valid) {
     await recordAttempt(db, email, ip, false);
@@ -65,3 +58,5 @@ export async function onRequestPost(context) {
   response.headers.set('Set-Cookie', setAuthCookie(token));
   return response;
 }
+
+export const onRequestPost = withErrorLogging(handleLogin, "POST /auth/login");
